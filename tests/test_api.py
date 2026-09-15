@@ -1,5 +1,5 @@
 """
-API Integration Tests for LLM RAG Starter.
+API Integration Tests for the LLM Gateway Service.
 Tests /health, /api/chat, /api/chat/fast-prompts, and CORS headers.
 Completely mocked (zero tokens consumed).
 """
@@ -36,7 +36,6 @@ async def test_health():
         assert response.status_code == 200
         data = response.json()
         assert data["status"] == "healthy"
-        assert "rag_index" in data
         assert "gateway" in data
 
 
@@ -56,22 +55,8 @@ async def test_get_fast_prompts():
 
 
 @pytest.mark.asyncio
-async def test_chat_conversational_canned():
-    """Test POST /api/chat with conversational greeting bypasses LLM (0 tokens)."""
-    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
-        payload = {"messages": [{"role": "user", "content": "Hello!"}]}
-        response = await client.post("/api/chat", json=payload)
-        assert response.status_code == 200
-        data = response.json()
-        assert data["provider"] == "canned_response"
-        assert data["intent"] == "greeting"
-        assert data["usage"]["total_tokens"] == 0
-        assert len(data["reply"]) > 5
-
-
-@pytest.mark.asyncio
-async def test_chat_domain_query_via_gateway():
-    """Test POST /api/chat with technical query retrieves context and routes to gateway."""
+async def test_chat_routes_through_gateway():
+    """Test POST /api/chat routes the conversation through the LLM gateway."""
     mock_return = (
         "Apex Cloud API requests are authenticated by passing your API key in the Authorization header.",
         "Primary Mock Provider",
@@ -91,5 +76,4 @@ async def test_chat_domain_query_via_gateway():
             assert data["provider"] == "Primary Mock Provider"
             assert data["model"] == "mock-model"
             assert data["usage"]["total_tokens"] == 60
-            assert len(data["sources"]) >= 1
             mock_gen.assert_called_once()

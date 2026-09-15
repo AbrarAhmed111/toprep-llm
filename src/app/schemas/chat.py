@@ -35,13 +35,11 @@ class UsageInfo(BaseModel):
 
 
 class ChatResponse(BaseModel):
-    """Chat completion response including answer, provider info, detected intent, and status events."""
-    reply: str = Field(..., description="The assistant or canned response text")
+    """Chat completion response including answer, provider info, and status events."""
+    reply: str = Field(..., description="The assistant response text")
     provider: str = Field(..., description="Provider that fulfilled the request")
-    model: str = Field(..., description="Model name or rule identifier")
+    model: str = Field(..., description="Model name used to generate the response")
     usage: UsageInfo = Field(default_factory=UsageInfo, description="Token consumption metrics")
-    intent: Optional[str] = Field(None, description="Detected user intent")
-    sources: List[str] = Field(default_factory=list, description="Retrieved document sources")
     status_events: List[ProviderStatusEventSchema] = Field(
         default_factory=list,
         description="Failover or provider status event history",

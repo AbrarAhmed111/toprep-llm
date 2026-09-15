@@ -1,1 +1,1 @@
-"""LLM RAG Starter Application Package."""
+"""LLM Gateway Service Application Package."""

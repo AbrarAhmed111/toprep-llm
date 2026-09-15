@@ -4,9 +4,9 @@
   <img src="https://www.abrarahmed.pro/assets/devAbby-fulllogo-C9-MX7QK.png" alt="Built by Abrar Ahmed" height="65" />
 </a>
 
-# 🚀 LLM FastAPI RAG Starter Template
+# 🚀 LLM Gateway Service
 
-**A production-ready, domain-agnostic RAG (Retrieval-Augmented Generation) backend template** for building intelligent LLM applications with grounded retrieval, multi-provider failover, and intent-based routing.
+**A production-ready FastAPI backend** for chat completions with a multi-provider LLM gateway and automatic failover.
 
 Built by **[Abrar Ahmed](https://www.abrarahmed.pro)** | Managed with [uv](https://docs.astral.sh/uv/)
 
@@ -20,29 +20,10 @@ Built by **[Abrar Ahmed](https://www.abrarahmed.pro)** | Managed with [uv](https
 
 ---
 
-Designed to be your production-ready foundation for **RAG-powered AI applications**: intelligent chatbots, knowledge base systems, document Q&A engines, semantic search platforms, and grounded generative APIs.
-
----
-
 ## ✨ Core Features
 
-### 🔍 RAG Pipeline (Retrieval-Augmented Generation)
-- **Document Ingestion** - Load and process various document formats (Markdown, PDFs, etc.)
-- **Intelligent Chunking** - Smart text splitting with configurable chunk sizes and overlap
-- **Vector Embeddings** - Generate semantic embeddings for documents (OpenAI, local models)
-- **Hybrid Vector Store** - In-memory vector database with semantic + BM25 hybrid search
-- **Context Retrieval** - Efficient similarity search with relevance scoring
-- **Grounded Response Assembly** - Automatically inject retrieved context into LLM prompts
-
-### 🎯 Intent Detection & Routing
-- **Rule-Based Intent Detection** - Zero-LLM offline intent classification
-- **Intent Normalization** - Normalize user queries for consistent routing
-- **Canned Responses** - Quick dispatch for common intents (zero tokens consumed)
-- **Fallback to RAG** - Intelligent fallback when no intent match found
-- **Conversational Shortcuts** - Reduce token usage with predefined shortcuts
-
 ### 🔄 Multi-Provider LLM Gateway
-- **Seamless Provider Switching** - Support for **OpenAI**, **Groq**, **DeepSeek**, **Ollama**, **OpenRouter**, **Together AI**, **vLLM**
+- **Seamless Provider Switching** - Support for **OpenAI**, **Groq**, **DeepSeek**, **Ollama**, **OpenRouter**, **Together AI**, **vLLM**, **Google Gemini**, **Mistral**, **Cerebras**
 - **Automatic Failover** - Fallback to secondary providers on failure
 - **Provider Health Monitoring** - Track provider status and availability
 - **Error Classification** - Intelligent error categorization and recovery
@@ -50,7 +31,6 @@ Designed to be your production-ready foundation for **RAG-powered AI application
 
 ### 💬 Chat & Streaming
 - `POST /api/chat` - Standard JSON chat completions
-- `POST /api/chat/stream` - Real-time **Server-Sent Events (SSE)** token streaming
 - `GET /api/chat/fast-prompts` - Retrieve pre-built prompts for quick interactions
 - Multi-turn conversation support with message history
 
@@ -62,34 +42,6 @@ Designed to be your production-ready foundation for **RAG-powered AI application
 - 📚 **Auto-Generated Docs** - Interactive Swagger at `/docs` and ReDoc at `/redoc`
 - 🌐 **CORS Middleware** - Pre-configured for cross-origin requests
 - 🚀 **Async/Await Throughout** - Full async Python for high concurrency
-
----
-
-## 📊 RAG Concepts Explained
-
-### What is RAG?
-**Retrieval-Augmented Generation** augments LLM prompts with relevant context from a knowledge base, enabling:
-- ✅ Grounded responses backed by actual documents
-- ✅ Reduced hallucinations
-- ✅ Up-to-date information (not limited by training data)
-- ✅ Custom domain knowledge integration
-
-### RAG Pipeline Flow
-```
-User Query
-    ↓
-[Intent Detection] → Matches intent? → Return canned response
-    ↓ No
-[Vector Store Retrieval] → Search for similar documents
-    ↓
-[Context Assembly] → Rank and format retrieved chunks
-    ↓
-[Prompt Injection] → "Given this context: {...}, answer: {query}"
-    ↓
-[LLM Gateway] → Get response from best available provider
-    ↓
-Response to User
-```
 
 ---
 
@@ -112,18 +64,7 @@ src/
 │   │   └── logging.py                # Logging configuration
 │   │
 │   ├── services/                     # Business Logic Layer
-│   │   └── chat_service.py           # Orchestrates intent → RAG → LLM
-│   │
-│   ├── rag/                          # RAG Pipeline Components
-│   │   ├── pipeline.py               # Main RAG orchestration
-│   │   ├── ingestion/
-│   │   │   └── loader.py             # Document loading
-│   │   ├── chunking/
-│   │   │   └── text_splitter.py      # Smart text chunking
-│   │   ├── retrieval/
-│   │   │   └── vector_store.py       # Vector DB & hybrid search
-│   │   └── context/
-│   │       └── builder.py            # Context formatting for LLM
+│   │   └── chat_service.py           # Orchestrates message normalization → LLM
 │   │
 │   ├── gateway/                      # LLM Gateway & Failover
 │   │   ├── gateway.py                # Multi-provider LLM client
@@ -131,26 +72,13 @@ src/
 │   │   ├── error_classifier.py       # Error categorization
 │   │   └── status.py                 # Provider health tracking
 │   │
-│   ├── intent/                       # Intent Detection & Routing
-│   │   ├── detector.py               # Rule-based intent classifier
-│   │   ├── normalizer.py             # Query normalization
-│   │   ├── responses.py              # Canned responses
-│   │   └── types.py                  # Intent type definitions
-│   │
 │   └── schemas/                      # Pydantic Data Models
-│       ├── chat.py                   # Chat request/response schemas
-│       └── rag.py                    # RAG-related schemas
+│       └── chat.py                   # Chat request/response schemas
 │
 ├── tests/                            # Test Suite
 │   ├── conftest.py                   # Pytest configuration
 │   ├── test_api.py                   # API endpoint tests
-│   ├── test_gateway.py               # LLM gateway tests
-│   ├── test_intent_detector.py       # Intent detection tests
-│   └── test_rag.py                   # RAG pipeline tests
-│
-├── knowledge/                        # Knowledge Base
-│   └── documents/                    # Sample documents for RAG
-│       └── sample_guide.md
+│   └── test_gateway.py               # LLM gateway tests
 │
 ├── run.py                            # Server entry point
 ├── pyproject.toml                    # Dependencies & tool config
@@ -162,11 +90,8 @@ src/
 
 | Component | Purpose | Design |
 |-----------|---------|--------|
-| **RAG Pipeline** | End-to-end retrieval + generation | Modular, chainable stages |
-| **Intent Detector** | Route before RAG | Zero-LLM, offline rule-based |
 | **LLM Gateway** | Provider abstraction | Multi-provider with failover |
-| **Vector Store** | Efficient retrieval | Hybrid (semantic + BM25) |
-| **Chat Service** | Orchestration | Combines intent → RAG → LLM |
+| **Chat Service** | Orchestration | Normalizes messages → LLM Gateway |
 
 ---
 
@@ -188,7 +113,7 @@ powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | ie
 ### 2. Setup Environment
 ```bash
 # Clone or enter your project
-cd llm-fastapi-template
+cd toprep-llm-youtube
 
 # Copy environment file
 cp .env.example .env
@@ -234,16 +159,6 @@ LLM_BASE_URL=https://openrouter.ai/api/v1
 LLM_DEFAULT_MODEL=anthropic/claude-3.5-sonnet
 ```
 
-### 4. Add Knowledge Base Documents
-Place your markdown documents in `knowledge/documents/`:
-```
-knowledge/documents/
-├── sample_guide.md
-├── faq.md
-├── documentation.md
-└── ...
-```
-
 ---
 
 ## 🏃 Running the Server
@@ -273,37 +188,19 @@ uv run uvicorn src.app.main:app --reload
 curl http://localhost:8000/health
 ```
 
-### 2. Chat with RAG
+### 2. Chat
 ```bash
 curl -X POST http://localhost:8000/api/chat \
   -H "Content-Type: application/json" \
   -d '{
     "messages": [
-      {"role": "user", "content": "What does the documentation say about RAG?"}
+      {"role": "user", "content": "Hello, how can you help me?"}
     ],
     "temperature": 0.7
   }'
 ```
 
-**Response Flow:**
-1. Intent detection (matches or not)
-2. If no intent match → Vector store search
-3. Relevant documents retrieved
-4. Context injected into LLM prompt
-5. LLM response grounded in your documents
-
-### 3. Streaming Chat
-```bash
-curl -N -X POST http://localhost:8000/api/chat/stream \
-  -H "Content-Type: application/json" \
-  -d '{
-    "messages": [
-      {"role": "user", "content": "Explain vector embeddings"}
-    ]
-  }'
-```
-
-### 4. Fast Prompts
+### 3. Fast Prompts
 ```bash
 curl http://localhost:8000/api/chat/fast-prompts
 ```
@@ -324,12 +221,10 @@ LLM_DEFAULT_MODEL=gpt-4o-mini
 LLM_TIMEOUT=60
 ```
 
-**RAG Configuration:**
+**Gateway Configuration:**
 ```env
-RAG_CHUNK_SIZE=1000
-RAG_CHUNK_OVERLAP=100
-RAG_RETRIEVAL_TOP_K=5
-RAG_MIN_SIMILARITY_SCORE=0.5
+GATEWAY_MAX_ATTEMPTS=10
+GATEWAY_COOLDOWN_SECONDS=60
 ```
 
 **Server Configuration:**
@@ -356,91 +251,13 @@ uv run pytest
 
 Run specific test file:
 ```bash
-uv run pytest tests/test_rag.py -v
+uv run pytest tests/test_gateway.py -v
 ```
 
 Run with coverage:
 ```bash
 uv run pytest --cov=src.app tests/
 ```
-
----
-
-## 📚 How RAG Works in This Template
-
-### 1. **Document Ingestion**
-```python
-from src.app.rag.ingestion.loader import DocumentLoader
-
-loader = DocumentLoader()
-documents = loader.load_documents("knowledge/documents/")
-```
-
-### 2. **Chunking**
-```python
-from src.app.rag.chunking.text_splitter import MarkdownTextSplitter
-
-splitter = MarkdownTextSplitter(chunk_size=1000, overlap=100)
-chunks = splitter.split_documents(documents)
-```
-
-### 3. **Vector Storage**
-```python
-from src.app.rag.retrieval.vector_store import InMemoryHybridVectorStore
-
-vector_store = InMemoryHybridVectorStore()
-vector_store.add_documents(chunks)
-```
-
-### 4. **Retrieval**
-```python
-results = vector_store.search(
-    query="What is RAG?",
-    top_k=5,
-    min_similarity=0.5
-)
-```
-
-### 5. **Context Building**
-```python
-from src.app.rag.context.builder import ContextBuilder
-
-builder = ContextBuilder()
-context = builder.build_context(results)
-```
-
-### 6. **LLM Invocation**
-```python
-prompt = f"Given this context: {context}\n\nQuestion: {user_query}"
-response = await llm_gateway.generate(prompt)
-```
-
----
-
-## 🛣️ Common Use Cases
-
-### Chatbot with Knowledge Base
-- Load company documentation
-- User asks question
-- System retrieves relevant docs
-- LLM grounds response in documentation
-
-### Document Q&A System
-- Ingest PDFs/docs
-- Allow users to ask questions
-- Retrieve most relevant sections
-- Generate answers backed by source
-
-### Semantic Search Engine
-- Index documents with embeddings
-- Search using natural language
-- Return ranked results with context
-
-### Customer Support Bot
-- Knowledge base of support articles
-- Detect customer intent
-- Retrieve relevant solutions
-- Generate personalized responses
 
 ---
 
@@ -482,61 +299,19 @@ All dependencies managed by `uv` and defined in `pyproject.toml`.
 
 ---
 
-## 🚀 Next Steps
+## 🛠️ Adding New Features to Your Product
 
-1. **Customize Intent Detector** - Add your domain-specific intents in `src/app/intent/detector.py`
-2. **Add Domain Documents** - Place your knowledge base in `knowledge/documents/`
-3. **Tune RAG Parameters** - Adjust chunk size, similarity thresholds, and retrieval strategies
-4. **Extend Chat Service** - Add custom business logic in `src/app/services/chat_service.py`
-5. **Monitor & Optimize** - Track provider performance and tune failover strategies
+When building a new AI product on top of this service:
+1. **Add new schemas** in `schemas/` (e.g. `schemas/agent.py`).
+2. **Add pure logic & prompt templates** in `services/`.
+3. **Add route handlers** in `api/routes/`.
+4. **Mount router** in `api/router.py` using `app.include_router(...)`.
 
 ---
 
 ## 📄 License
 
-MIT License - See [LICENSE](LICENSE) for details
-
----
-
-## 👨‍💻 Built By
-
-**[Abrar Ahmed](https://www.abrarahmed.pro)** - AI Engineer & Full-Stack Developer
-
----
-
-## 📝 Contributing
-
-Contributions welcome! Please feel free to submit pull requests or open issues.
-
----
-
-**Made with ❤️ for the AI community**
-```bash
-curl -X POST http://localhost:8000/api/embeddings \
-  -H "Content-Type: application/json" \
-  -d '{
-    "input": ["Artificial Intelligence", "FastAPI backend template"]
-  }'
-```
-
----
-
-## 🧪 Testing
-
-Run the test suite with `uv`:
-```bash
-uv run pytest
-```
-
----
-
-## 🛠️ Adding New Features to Your Product
-
-When building a new AI product on top of this template:
-1. **Add new schemas** in `schemas/` (e.g. `schemas/agent.py` or `schemas/rag.py`).
-2. **Add pure logic & prompt templates** in `services/` (e.g. `services/rag.py` or `services/prompts.py`).
-3. **Add route handlers** in `api/routers/` (e.g. `api/routers/rag.py`).
-4. **Mount router** in `api/main.py` using `app.include_router(...)`.
+This project is licensed under the MIT License — see the [LICENSE](LICENSE) file for details.
 
 ---
 
@@ -547,11 +322,3 @@ Built with ❤️ by **[Abrar Ahmed](https://www.abrarahmed.pro)**
 <a href="https://www.abrarahmed.pro" target="_blank">
   <img src="https://www.abrarahmed.pro/assets/devAbby-fulllogo-C9-MX7QK.png" alt="devAbby logo" height="50" />
 </a>
-
----
-
-## 📄 License
-
-This project is licensed under the MIT License — see the [LICENSE](LICENSE) file for details.
-
-

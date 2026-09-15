@@ -1,1 +1,1 @@
-"""Test suite for LLM RAG Starter."""
+"""Test suite for the LLM Gateway Service."""

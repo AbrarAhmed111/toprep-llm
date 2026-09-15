@@ -7,7 +7,6 @@ from .chat import (
     FastPrompt,
     FastPromptsResponse,
 )
-from .rag import DocumentChunk, RetrievalResult
 
 __all__ = [
     "ChatMessage",
@@ -17,6 +16,4 @@ __all__ = [
     "ProviderStatusEventSchema",
     "FastPrompt",
     "FastPromptsResponse",
-    "DocumentChunk",
-    "RetrievalResult",
 ]

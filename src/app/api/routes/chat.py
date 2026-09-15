@@ -18,13 +18,11 @@ async def get_fast_prompts() -> FastPromptsResponse:
     return chat_service.get_fast_prompts()
 
 
-@router.post("", response_model=ChatResponse, summary="Chat Completion with Intent Detection & Gateway")
+@router.post("", response_model=ChatResponse, summary="Chat Completion via LLM Gateway")
 async def chat_endpoint(request: ChatRequest) -> ChatResponse:
     """
     Main Chat Completion Endpoint:
-    - Checks intent (bypasses LLM with 0 tokens for conversational greetings/thanks).
-    - Performs RAG retrieval for substantive domain questions.
-    - Routes domain requests through the LLM Gateway with multi-provider failover.
+    - Routes the conversation through the LLM Gateway with multi-provider failover.
     """
     try:
         return await chat_service.process_chat(request)

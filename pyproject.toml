@@ -1,7 +1,7 @@
 [project]
-name = "llm-rag-starter"
+name = "llm-gateway-service"
 version = "1.0.0"
-description = "A production-oriented, domain-agnostic LLM and RAG starter template with multi-provider failover, rule-based intent routing, and grounded retrieval."
+description = "A production-oriented LLM chat backend with a multi-provider gateway and automatic failover."
 readme = "README.md"
 requires-python = ">=3.10"
 license = "MIT"

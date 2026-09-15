@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     """Global configuration settings."""
 
     # Application
-    APP_NAME: str = "LLM RAG Starter"
+    APP_NAME: str = "LLM Gateway Service"
     ENVIRONMENT: str = "development"
     LOG_LEVEL: str = "INFO"
     HOST: str = "0.0.0.0"
@@ -20,15 +20,6 @@ class Settings(BaseSettings):
 
     # CORS Whitelist (comma-separated strings)
     ALLOWED_ORIGINS: str = "http://localhost:3000,http://127.0.0.1:3000"
-
-    # Assistant Identity
-    ASSISTANT_NAME: str = "AI Knowledge Assistant"
-
-    # RAG Knowledge Base Configuration
-    KNOWLEDGE_BASE_PATH: str = "knowledge/documents"
-    RAG_TOP_K: int = 3
-    RAG_CHUNK_SIZE: int = 600
-    RAG_CHUNK_OVERLAP: int = 100
 
     # Gateway Default Settings
     GATEWAY_MAX_ATTEMPTS: int = 10
@@ -65,21 +56,6 @@ class Settings(BaseSettings):
         env_file_encoding="utf-8",
         extra="ignore",
     )
-
-    @property
-    def resolved_knowledge_path(self) -> str:
-        """Resolves knowledge base path whether executed from project root or parent."""
-        from pathlib import Path
-        p = Path(self.KNOWLEDGE_BASE_PATH)
-        if p.is_absolute() and p.exists():
-            return str(p)
-
-        # Resolve relative to starter project root (app/../knowledge/documents)
-        project_root = Path(__file__).resolve().parent.parent.parent
-        candidate = project_root / p
-        if candidate.exists():
-            return str(candidate)
-        return str(p)
 
     @property
     def allowed_origins_list(self) -> List[str]:
