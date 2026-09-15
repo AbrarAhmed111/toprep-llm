@@ -40,6 +40,12 @@ Built by **[Abrar Ahmed](https://www.abrarahmed.pro)** | Managed with [uv](https
 - **Sorting** - relevance, views, newest, oldest
 - **Results per topic** - capped and configurable via `max_results`
 
+### 🧭 AI Topic Organization
+- `POST /api/topics/organize` - Suggest a learning order for a preparation's topics
+- Orders topics by prerequisites, dependencies, and conceptual progression
+- Returns a strict permutation of the input topic IDs plus a one-sentence rationale
+- Ordering only — never applied silently; the caller shows the suggestion for explicit review/accept
+
 ### 🛡️ Production Features
 - ⚡ **Powered by `uv`** - Lightning-fast dependency management
 - 🔐 **Type-Safe Settings** - Environment variables with pydantic-settings
@@ -64,6 +70,7 @@ src/
 │   │   └── routes/
 │   │       ├── chat.py               # Chat endpoints
 │   │       ├── youtube.py            # YouTube topic search endpoint
+│   │       ├── topics.py             # AI topic organization endpoint
 │   │       └── health.py             # Health check endpoint
 │   │
 │   ├── core/                         # Core Configuration
@@ -72,7 +79,8 @@ src/
 │   │
 │   ├── services/                     # Business Logic Layer
 │   │   ├── chat_service.py           # Orchestrates message normalization → LLM
-│   │   └── youtube_service.py        # YouTube search, enrichment, filtering, sorting
+│   │   ├── youtube_service.py        # YouTube search, enrichment, filtering, sorting
+│   │   └── topic_organizer_service.py# Builds the ordering prompt, validates the AI's permutation
 │   │
 │   ├── gateway/                      # LLM Gateway & Failover
 │   │   ├── gateway.py                # Multi-provider LLM client
@@ -82,13 +90,15 @@ src/
 │   │
 │   └── schemas/                      # Pydantic Data Models
 │       ├── chat.py                   # Chat request/response schemas
-│       └── youtube.py                # YouTube search request/response/filter schemas
+│       ├── youtube.py                # YouTube search request/response/filter schemas
+│       └── topics.py                 # Topic organization request/response schemas
 │
 ├── tests/                            # Test Suite
 │   ├── conftest.py                   # Pytest configuration
 │   ├── test_api.py                   # API endpoint tests
 │   ├── test_gateway.py               # LLM gateway tests
-│   └── test_youtube.py               # YouTube search service & endpoint tests
+│   ├── test_youtube.py               # YouTube search service & endpoint tests
+│   └── test_topic_organizer.py       # AI topic organizer service & endpoint tests
 │
 ├── run.py                            # Server entry point
 ├── pyproject.toml                    # Dependencies & tool config
@@ -103,6 +113,7 @@ src/
 | **LLM Gateway** | Provider abstraction | Multi-provider with failover |
 | **Chat Service** | Orchestration | Normalizes messages → LLM Gateway |
 | **YouTube Service** | Topic video search | search.list → videos.list enrichment → filter → sort |
+| **Topic Organizer** | AI-assisted ordering | Index-based JSON prompt → strict permutation validation |
 
 ---
 
@@ -238,6 +249,25 @@ curl -X POST http://localhost:8000/api/youtube/search \
 ```
 
 `filters` is optional — omit it entirely for a relevance-sorted, unfiltered search of up to `YOUTUBE_DEFAULT_MAX_RESULTS` videos.
+
+### 5. AI Topic Organization
+```bash
+curl -X POST http://localhost:8000/api/topics/organize \
+  -H "Content-Type: application/json" \
+  -d '{
+    "preparation_title": "Full Stack Developer Interview",
+    "preparation_type": "Interview",
+    "topics": [
+      {"id": "t1", "name": "React"},
+      {"id": "t2", "name": "JavaScript"},
+      {"id": "t3", "name": "Next.js"},
+      {"id": "t4", "name": "TypeScript"},
+      {"id": "t5", "name": "Node.js"}
+    ]
+  }'
+```
+
+Returns `ordered_topic_ids` (a permutation of the input IDs) plus a one-sentence `reasoning`. Requires at least two topics.
 
 ---
 

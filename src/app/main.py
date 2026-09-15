@@ -50,6 +50,7 @@ async def root():
             "chat": "/api/chat",
             "fast_prompts": "/api/chat/fast-prompts",
             "youtube_search": "/api/youtube/search",
+            "organize_topics": "/api/topics/organize",
             "health": "/health",
         },
     }

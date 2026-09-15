@@ -15,6 +15,11 @@ from .youtube import (
     YouTubeSearchRequest,
     YouTubeSearchResponse,
 )
+from .topics import (
+    OrganizeTopicItem,
+    TopicOrganizeRequest,
+    TopicOrganizeResponse,
+)
 
 __all__ = [
     "ChatMessage",
@@ -30,4 +35,7 @@ __all__ = [
     "YouTubeVideo",
     "YouTubeSearchRequest",
     "YouTubeSearchResponse",
+    "OrganizeTopicItem",
+    "TopicOrganizeRequest",
+    "TopicOrganizeResponse",
 ]
