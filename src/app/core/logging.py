@@ -23,3 +23,8 @@ def setup_logging(log_level: str = "INFO") -> None:
     logging.getLogger("httpcore").setLevel(logging.WARNING)
     logging.getLogger("httpx").setLevel(logging.WARNING)
     logging.getLogger("openai").setLevel(logging.WARNING)
+
+    # Ensure AI and Gateway logs are visible
+    logging.getLogger("AIService").setLevel(logging.DEBUG)
+    logging.getLogger("AIRouter").setLevel(logging.DEBUG)
+    logging.getLogger("LLMGateway").setLevel(logging.DEBUG)

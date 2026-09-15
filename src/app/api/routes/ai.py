@@ -3,6 +3,7 @@ AI Features API Endpoints.
 Thin route handlers delegating to ai_service.
 """
 
+import logging
 from fastapi import APIRouter, HTTPException, status
 from src.app.schemas.ai import (
     AIExplanationRequest,
@@ -12,6 +13,7 @@ from src.app.schemas.ai import (
 )
 from src.app.services.ai_service import ai_service
 
+logger = logging.getLogger("AIRouter")
 router = APIRouter(prefix="/ai", tags=["AI Features"])
 
 
@@ -23,9 +25,13 @@ async def generate_explanation(request: AIExplanationRequest) -> AIExplanationRe
     The explanation is beginner-friendly and contextual to the preparation type.
     Uses multi-provider LLM Gateway with automatic failover.
     """
+    logger.debug(f"📨 Received explanation request for: {request.topic_name}")
     try:
-        return await ai_service.generate_explanation(request)
+        result = await ai_service.generate_explanation(request)
+        logger.debug(f"📤 Returning explanation response for: {request.topic_name}")
+        return result
     except Exception as e:
+        logger.error(f"🚨 Explanation endpoint error: {type(e).__name__}: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to generate explanation: {str(e)}",
@@ -40,9 +46,13 @@ async def generate_questions(request: AIQuestionsRequest) -> AIQuestionsResponse
     Questions are realistic and tailored to the preparation type and context.
     Uses multi-provider LLM Gateway with automatic failover.
     """
+    logger.debug(f"📨 Received questions request for: {request.topic_name}")
     try:
-        return await ai_service.generate_questions(request)
+        result = await ai_service.generate_questions(request)
+        logger.debug(f"📤 Returning questions response for: {request.topic_name}")
+        return result
     except Exception as e:
+        logger.error(f"🚨 Questions endpoint error: {type(e).__name__}: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to generate questions: {str(e)}",

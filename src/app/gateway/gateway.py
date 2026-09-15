@@ -290,3 +290,12 @@ class LLMGateway:
         raise RuntimeError(
             f"All LLM providers are currently unavailable or in cooldown. Last error: {str(last_error)}"
         )
+
+    async def invoke(
+        self,
+        messages: List[BaseMessage],
+        temperature: Optional[float] = 0.7,
+        max_tokens: Optional[int] = None,
+    ) -> Tuple[str, str, str, Dict[str, int], List[ProviderStatusEvent]]:
+        """Alias for generate() - invokes the gateway with automatic fallback."""
+        return await self.generate(messages, temperature, max_tokens)

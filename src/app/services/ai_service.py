@@ -50,7 +50,10 @@ class AIService:
         system_prompt = self._build_explanation_system_prompt()
         user_prompt = self._build_explanation_user_prompt(request)
 
-        logger.info(f"📝 Generating explanation for topic: {request.topic_name}")
+        logger.info(
+            f"📝 Generating explanation for topic: {request.topic_name} | "
+            f"Prep type: {request.preparation_type or 'N/A'}"
+        )
 
         messages = [
             SystemMessage(content=system_prompt),
@@ -58,6 +61,7 @@ class AIService:
         ]
 
         try:
+            logger.debug("🔄 Invoking LLM Gateway with automatic failover...")
             response_text, provider_name, model_name, usage, status_events = await self.gateway.invoke(
                 messages=messages,
                 temperature=0.7,
@@ -66,8 +70,19 @@ class AIService:
 
             explanation = response_text.strip()
 
-            logger.info(f"✅ Explanation generated for {request.topic_name}")
-            logger.debug(f"Provider: {provider_name}, Model: {model_name}")
+            logger.info(
+                f"✅ Explanation generated successfully | "
+                f"Provider: {provider_name} | Model: {model_name} | "
+                f"Length: {len(explanation)} chars"
+            )
+
+            # Log status events (provider attempts, fallbacks)
+            if status_events:
+                for event in status_events:
+                    if event.status == "fallback":
+                        logger.warning(f"⚠️ Gateway fallback: {event.message}")
+                    elif event.status == "switched":
+                        logger.info(f"✅ Gateway switched: {event.message}")
 
             return AIExplanationResponse(
                 explanation=explanation,
@@ -76,7 +91,9 @@ class AIService:
             )
 
         except Exception as e:
-            logger.error(f"❌ Failed to generate explanation: {str(e)}")
+            logger.error(
+                f"❌ Failed to generate explanation for '{request.topic_name}': {type(e).__name__}: {str(e)}"
+            )
             raise
 
     async def generate_questions(
@@ -94,7 +111,10 @@ class AIService:
         system_prompt = self._build_questions_system_prompt()
         user_prompt = self._build_questions_user_prompt(request)
 
-        logger.info(f"❓ Generating questions for topic: {request.topic_name}")
+        logger.info(
+            f"❓ Generating questions for topic: {request.topic_name} | "
+            f"Prep type: {request.preparation_type or 'N/A'}"
+        )
 
         messages = [
             SystemMessage(content=system_prompt),
@@ -102,6 +122,7 @@ class AIService:
         ]
 
         try:
+            logger.debug("🔄 Invoking LLM Gateway with automatic failover...")
             response_text, provider_name, model_name, usage, status_events = await self.gateway.invoke(
                 messages=messages,
                 temperature=0.8,
@@ -111,8 +132,18 @@ class AIService:
             questions_text = response_text.strip()
             questions = self._parse_questions(questions_text)
 
-            logger.info(f"✅ Generated {len(questions)} questions for {request.topic_name}")
-            logger.debug(f"Provider: {provider_name}, Model: {model_name}")
+            logger.info(
+                f"✅ Generated {len(questions)} questions for '{request.topic_name}' | "
+                f"Provider: {provider_name} | Model: {model_name}"
+            )
+
+            # Log status events (provider attempts, fallbacks)
+            if status_events:
+                for event in status_events:
+                    if event.status == "fallback":
+                        logger.warning(f"⚠️ Gateway fallback: {event.message}")
+                    elif event.status == "switched":
+                        logger.info(f"✅ Gateway switched: {event.message}")
 
             return AIQuestionsResponse(
                 questions=questions,
@@ -121,7 +152,9 @@ class AIService:
             )
 
         except Exception as e:
-            logger.error(f"❌ Failed to generate questions: {str(e)}")
+            logger.error(
+                f"❌ Failed to generate questions for '{request.topic_name}': {type(e).__name__}: {str(e)}"
+            )
             raise
 
     def _build_explanation_system_prompt(self) -> str:
