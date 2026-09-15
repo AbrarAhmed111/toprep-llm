@@ -34,6 +34,12 @@ Built by **[Abrar Ahmed](https://www.abrarahmed.pro)** | Managed with [uv](https
 - `GET /api/chat/fast-prompts` - Retrieve pre-built prompts for quick interactions
 - Multi-turn conversation support with message history
 
+### 🎬 YouTube Topic Search
+- `POST /api/youtube/search` - Find videos relevant to a topic
+- **Filters** - min/max duration, min/max views, published-date window (any time, past month, past 6 months, past year, or a custom range), language hint, exclude Shorts, exclude live/upcoming streams
+- **Sorting** - relevance, views, newest, oldest
+- **Results per topic** - capped and configurable via `max_results`
+
 ### 🛡️ Production Features
 - ⚡ **Powered by `uv`** - Lightning-fast dependency management
 - 🔐 **Type-Safe Settings** - Environment variables with pydantic-settings
@@ -57,6 +63,7 @@ src/
 │   │   ├── router.py                 # Main API router
 │   │   └── routes/
 │   │       ├── chat.py               # Chat endpoints
+│   │       ├── youtube.py            # YouTube topic search endpoint
 │   │       └── health.py             # Health check endpoint
 │   │
 │   ├── core/                         # Core Configuration
@@ -64,7 +71,8 @@ src/
 │   │   └── logging.py                # Logging configuration
 │   │
 │   ├── services/                     # Business Logic Layer
-│   │   └── chat_service.py           # Orchestrates message normalization → LLM
+│   │   ├── chat_service.py           # Orchestrates message normalization → LLM
+│   │   └── youtube_service.py        # YouTube search, enrichment, filtering, sorting
 │   │
 │   ├── gateway/                      # LLM Gateway & Failover
 │   │   ├── gateway.py                # Multi-provider LLM client
@@ -73,12 +81,14 @@ src/
 │   │   └── status.py                 # Provider health tracking
 │   │
 │   └── schemas/                      # Pydantic Data Models
-│       └── chat.py                   # Chat request/response schemas
+│       ├── chat.py                   # Chat request/response schemas
+│       └── youtube.py                # YouTube search request/response/filter schemas
 │
 ├── tests/                            # Test Suite
 │   ├── conftest.py                   # Pytest configuration
 │   ├── test_api.py                   # API endpoint tests
-│   └── test_gateway.py               # LLM gateway tests
+│   ├── test_gateway.py               # LLM gateway tests
+│   └── test_youtube.py               # YouTube search service & endpoint tests
 │
 ├── run.py                            # Server entry point
 ├── pyproject.toml                    # Dependencies & tool config
@@ -92,6 +102,7 @@ src/
 |-----------|---------|--------|
 | **LLM Gateway** | Provider abstraction | Multi-provider with failover |
 | **Chat Service** | Orchestration | Normalizes messages → LLM Gateway |
+| **YouTube Service** | Topic video search | search.list → videos.list enrichment → filter → sort |
 
 ---
 
@@ -207,6 +218,27 @@ curl http://localhost:8000/api/chat/fast-prompts
 
 Returns pre-built quick prompts for immediate use.
 
+### 4. YouTube Topic Search
+```bash
+curl -X POST http://localhost:8000/api/youtube/search \
+  -H "Content-Type: application/json" \
+  -d '{
+    "topic": "React hooks",
+    "filters": {
+      "min_duration_seconds": 300,
+      "max_duration_seconds": 1800,
+      "min_views": 1000,
+      "published_window": "past_year",
+      "exclude_shorts": true,
+      "exclude_livestreams": true,
+      "max_results": 10,
+      "sort": "views"
+    }
+  }'
+```
+
+`filters` is optional — omit it entirely for a relevance-sorted, unfiltered search of up to `YOUTUBE_DEFAULT_MAX_RESULTS` videos.
+
 ---
 
 ## 🔧 Configuration
@@ -225,6 +257,15 @@ LLM_TIMEOUT=60
 ```env
 GATEWAY_MAX_ATTEMPTS=10
 GATEWAY_COOLDOWN_SECONDS=60
+```
+
+**YouTube Configuration:**
+```env
+YOUTUBE_API_KEY=your_youtube_data_api_key_here
+YOUTUBE_API_BASE_URL=https://www.googleapis.com/youtube/v3   # Optional
+YOUTUBE_REQUEST_TIMEOUT=15
+YOUTUBE_DEFAULT_MAX_RESULTS=10
+YOUTUBE_MAX_RESULTS_LIMIT=25
 ```
 
 **Server Configuration:**

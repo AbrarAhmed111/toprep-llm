@@ -49,6 +49,7 @@ async def root():
         "endpoints": {
             "chat": "/api/chat",
             "fast_prompts": "/api/chat/fast-prompts",
+            "youtube_search": "/api/youtube/search",
             "health": "/health",
         },
     }

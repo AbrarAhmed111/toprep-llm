@@ -51,6 +51,13 @@ class Settings(BaseSettings):
     CEREBRAS_API_KEY: str = ""
     CEREBRAS_MODEL: str = "qwen-3.8-27b"
 
+    # YouTube Data API Configuration
+    YOUTUBE_API_KEY: str = ""
+    YOUTUBE_API_BASE_URL: str = "https://www.googleapis.com/youtube/v3"
+    YOUTUBE_REQUEST_TIMEOUT: float = 15.0
+    YOUTUBE_DEFAULT_MAX_RESULTS: int = 10
+    YOUTUBE_MAX_RESULTS_LIMIT: int = 25
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",
