@@ -8,6 +8,8 @@
 
 **A production-ready FastAPI backend** for chat completions with a multi-provider LLM gateway and automatic failover.
 
+This service powers **[ToPrep](https://github.com/AbrarAhmed111/toprep)** — an AI-powered preparation platform for interviews, exams, and certifications.
+
 Built by **[Abrar Ahmed](https://www.abrarahmed.pro)** | Managed with [uv](https://docs.astral.sh/uv/)
 
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
@@ -30,7 +32,10 @@ Built by **[Abrar Ahmed](https://www.abrarahmed.pro)** | Managed with [uv](https
 - **Cost Optimization** - Route to most cost-effective providers
 
 ### 💬 Chat & Streaming
-- `POST /api/chat` - Standard JSON chat completions
+- `POST /api/chat` - Standard JSON chat completions with automatic provider failover
+  - Supports **Claude** (Anthropic), **GPT** (OpenAI), **Gemini** (Google)
+  - Automatic fallback if primary provider fails
+  - Streaming and non-streaming modes
 - `GET /api/chat/fast-prompts` - Retrieve pre-built prompts for quick interactions
 - Multi-turn conversation support with message history
 
@@ -367,6 +372,27 @@ uv run pytest --cov=src.app tests/
 - `httpx` - Async HTTP client
 
 All dependencies managed by `uv` and defined in `pyproject.toml`.
+
+---
+
+## 🔗 Integration with ToPrep Frontend
+
+This backend powers the **ToPrep** Next.js frontend with:
+
+| Feature | Endpoint | Frontend Component |
+|---------|----------|-------------------|
+| **Topic Explanations** | `POST /api/chat` | TopicContainer.tsx |
+| **Practice Questions** | `POST /api/chat` | TopicContainer.tsx |
+| **Video Search** | `POST /api/youtube/search` | YouTube components |
+| **Topic Ordering** | `POST /api/topics/organize` | SectionBoard.tsx |
+
+### Frontend Setup
+The frontend expects the backend at:
+```env
+NEXT_PUBLIC_API_BASE_URL=http://localhost:8000
+```
+
+Ensure this is configured in the frontend's `.env.local` before starting.
 
 ---
 
