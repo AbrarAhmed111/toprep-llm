@@ -14,7 +14,7 @@ from src.app.services.topic_organizer_service import (
     TopicOrganizerService,
     TopicOrganizerError,
 )
-from src.app.schemas.topics import OrganizeTopicItem
+from src.app.schemas.topics import OrganizeTopicItem, OrganizeSectionItem
 
 
 @pytest.fixture
@@ -111,6 +111,55 @@ async def test_organize_requires_at_least_two_topics():
 
 
 @pytest.mark.asyncio
+async def test_organize_returns_section_assignments():
+    service = TopicOrganizerService()
+    mock_reply = json.dumps(
+        {
+            "order": [1, 2, 0],
+            "topic_sections": ["Frontend", "Frontend", "JS Fundamentals"],
+            "reasoning": "Grouped by layer.",
+        }
+    )
+
+    with patch.object(
+        service.gateway,
+        "generate",
+        new=AsyncMock(return_value=(mock_reply, "Groq", "test-model", {}, [])),
+    ):
+        result = await service.organize(
+            "Frontend Interview",
+            "Interview",
+            TOPICS,
+            sections=[OrganizeSectionItem(id="s1", name="JS Fundamentals")],
+        )
+
+    # section_assignments is indexed in INPUT topic order (t1, t2, t3), not output order.
+    assignments = {a.topic_id: a.section_name for a in result.section_assignments}
+    assert assignments == {
+        "t1": "Frontend",
+        "t2": "Frontend",
+        "t3": "JS Fundamentals",
+    }
+
+
+@pytest.mark.asyncio
+async def test_organize_falls_back_to_ungrouped_on_malformed_sections():
+    service = TopicOrganizerService()
+    # topic_sections is the wrong length — should not fail the whole (valid) ordering.
+    mock_reply = json.dumps({"order": [1, 2, 0], "topic_sections": ["Frontend"]})
+
+    with patch.object(
+        service.gateway,
+        "generate",
+        new=AsyncMock(return_value=(mock_reply, "Groq", "test-model", {}, [])),
+    ):
+        result = await service.organize("Frontend Interview", "Interview", TOPICS)
+
+    assert result.ordered_topic_ids == ["t2", "t3", "t1"]
+    assert all(a.section_name is None for a in result.section_assignments)
+
+
+@pytest.mark.asyncio
 async def test_organize_wraps_gateway_failure():
     service = TopicOrganizerService()
 
@@ -151,6 +200,43 @@ async def test_organize_endpoint_success():
             data = response.json()
             assert data["ordered_topic_ids"] == ["t2", "t3", "t1"]
             assert data["reasoning"] == "Fundamentals first."
+
+
+@pytest.mark.asyncio
+async def test_organize_endpoint_returns_section_assignments():
+    mock_reply = json.dumps(
+        {
+            "order": [1, 2, 0],
+            "topic_sections": ["Frontend", "Frontend", "JS Fundamentals"],
+            "reasoning": "Grouped by layer.",
+        }
+    )
+
+    with patch(
+        "src.app.services.topic_organizer_service.topic_organizer_service.gateway.generate",
+        new=AsyncMock(return_value=(mock_reply, "Groq", "test-model", {}, [])),
+    ):
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            payload = {
+                "preparation_title": "Frontend Interview",
+                "topics": [
+                    {"id": "t1", "name": "React"},
+                    {"id": "t2", "name": "JavaScript"},
+                    {"id": "t3", "name": "TypeScript"},
+                ],
+                "sections": [{"id": "s1", "name": "JS Fundamentals"}],
+            }
+            response = await client.post("/api/topics/organize", json=payload)
+            assert response.status_code == 200
+            data = response.json()
+            assignments = {
+                a["topic_id"]: a["section_name"] for a in data["section_assignments"]
+            }
+            assert assignments == {
+                "t1": "Frontend",
+                "t2": "Frontend",
+                "t3": "JS Fundamentals",
+            }
 
 
 @pytest.mark.asyncio

@@ -17,6 +17,8 @@ from .youtube import (
 )
 from .topics import (
     OrganizeTopicItem,
+    OrganizeSectionItem,
+    TopicSectionAssignment,
     TopicOrganizeRequest,
     TopicOrganizeResponse,
 )
@@ -36,6 +38,8 @@ __all__ = [
     "YouTubeSearchRequest",
     "YouTubeSearchResponse",
     "OrganizeTopicItem",
+    "OrganizeSectionItem",
+    "TopicSectionAssignment",
     "TopicOrganizeRequest",
     "TopicOrganizeResponse",
 ]

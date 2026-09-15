@@ -25,6 +25,7 @@ async def organize_topics(request: TopicOrganizeRequest) -> TopicOrganizeRespons
             preparation_title=request.preparation_title,
             preparation_type=request.preparation_type,
             topics=request.topics,
+            sections=request.sections,
         )
     except TopicOrganizerError as e:
         raise HTTPException(status_code=e.status_code, detail=str(e))
