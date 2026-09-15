@@ -26,6 +26,9 @@ dev = [
 [tool.uv]
 package = false
 
+[tool.vercel]
+entrypoint = "src.app.main:app"
+
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]
