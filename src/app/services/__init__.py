@@ -5,6 +5,7 @@ from .topic_organizer_service import (
     topic_organizer_service,
     TopicOrganizerError,
 )
+from .ai_service import AIService, ai_service
 
 __all__ = [
     "ChatService",
@@ -16,4 +17,6 @@ __all__ = [
     "TopicOrganizerService",
     "topic_organizer_service",
     "TopicOrganizerError",
+    "AIService",
+    "ai_service",
 ]

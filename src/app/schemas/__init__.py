@@ -22,6 +22,12 @@ from .topics import (
     TopicOrganizeRequest,
     TopicOrganizeResponse,
 )
+from .ai import (
+    AIExplanationRequest,
+    AIExplanationResponse,
+    AIQuestionsRequest,
+    AIQuestionsResponse,
+)
 
 __all__ = [
     "ChatMessage",
@@ -42,4 +48,8 @@ __all__ = [
     "TopicSectionAssignment",
     "TopicOrganizeRequest",
     "TopicOrganizeResponse",
+    "AIExplanationRequest",
+    "AIExplanationResponse",
+    "AIQuestionsRequest",
+    "AIQuestionsResponse",
 ]
