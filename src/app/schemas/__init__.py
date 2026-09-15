@@ -7,14 +7,6 @@ from .chat import (
     FastPrompt,
     FastPromptsResponse,
 )
-from .youtube import (
-    PublishedWindow,
-    SortOrder,
-    YouTubeSearchFilters,
-    YouTubeVideo,
-    YouTubeSearchRequest,
-    YouTubeSearchResponse,
-)
 from .topics import (
     OrganizeTopicItem,
     OrganizeSectionItem,
@@ -37,12 +29,6 @@ __all__ = [
     "ProviderStatusEventSchema",
     "FastPrompt",
     "FastPromptsResponse",
-    "PublishedWindow",
-    "SortOrder",
-    "YouTubeSearchFilters",
-    "YouTubeVideo",
-    "YouTubeSearchRequest",
-    "YouTubeSearchResponse",
     "OrganizeTopicItem",
     "OrganizeSectionItem",
     "TopicSectionAssignment",
