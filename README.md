@@ -25,31 +25,36 @@ Built by **[Abrar Ahmed](https://www.abrarahmed.pro)** | Managed with [uv](https
 ## ✨ Core Features
 
 ### 🔄 Multi-Provider LLM Gateway
-- **Seamless Provider Switching** - Support for **OpenAI**, **Groq**, **DeepSeek**, **Ollama**, **OpenRouter**, **Together AI**, **vLLM**, **Google Gemini**, **Mistral**, **Cerebras**
-- **Automatic Failover** - Fallback to secondary providers on failure
-- **Provider Health Monitoring** - Track provider status and availability
-- **Error Classification** - Intelligent error categorization and recovery
-- **Cost Optimization** - Route to most cost-effective providers
+- **Seamless Provider Switching** - Support for **Google Gemini** (up to 4 rotated keys + a quality-fallback model), **Groq**, **OpenAI**, **Mistral**, **Cerebras**
+- **Automatic Failover** - Tries deployments in order (Gemini → Groq → OpenAI → Mistral → Cerebras), skipping any that aren't configured
+- **Provider Health Monitoring** - Cooldown tracking so a recently-failed deployment isn't retried immediately
+- **Error Classification** - Distinguishes retryable (rate limit, 5xx, timeout) from non-retryable (bad request, invalid key) failures
 
-### 💬 Chat & Streaming
-- `POST /api/chat` - Standard JSON chat completions with automatic provider failover
-  - Supports **Claude** (Anthropic), **GPT** (OpenAI), **Gemini** (Google)
-  - Automatic fallback if primary provider fails
-  - Streaming and non-streaming modes
+### 💬 Chat
+- `POST /api/chat` - Non-streaming JSON chat completions with automatic failover across whichever of the 5 providers above are configured
 - `GET /api/chat/fast-prompts` - Retrieve pre-built prompts for quick interactions
 - Multi-turn conversation support with message history
+- Not currently wired into the ToPrep frontend — a standalone capability available for a future chat UI
 
-### 🎬 YouTube Topic Search
-- `POST /api/youtube/search` - Find videos relevant to a topic
-- **Filters** - min/max duration, min/max views, published-date window (any time, past month, past 6 months, past year, or a custom range), language hint, exclude Shorts, exclude live/upcoming streams
-- **Sorting** - relevance, views, newest, oldest
-- **Results per topic** - capped and configurable via `max_results`
+### 🧠 AI Explanations & Practice Questions
+- `POST /api/ai/explain` - A brief 2-3 line explanation of a topic, given its name and preparation context
+- `POST /api/ai/questions` - 3-5 expected interview/exam questions for a topic
+- Both go through the same multi-provider gateway and return which `provider`/`model` answered
+- Powers `TopicContainer.tsx` in the ToPrep frontend (via `src/lib/api/aiService.ts`)
 
 ### 🧭 AI Topic Organization
 - `POST /api/topics/organize` - Suggest a learning order for a preparation's topics
 - Orders topics by prerequisites, dependencies, and conceptual progression
 - Returns a strict permutation of the input topic IDs plus a one-sentence rationale
 - Ordering only — never applied silently; the caller shows the suggestion for explicit review/accept
+
+### 📄 PDF Topic Extraction
+- `POST /api/topics/extract-pdf` - Upload a PDF, get back a flat list of learning topics
+- **Pipeline**: validate → extract text (PyMuPDF, page-level, TOC-aware) → OCR fallback for scanned pages → clean (strip repeated headers/footers/page numbers) → chunk (TOC-aligned or windowed) → LLM topic extraction per chunk → LLM normalization/dedup across chunks
+- Every LLM call goes through the same multi-provider gateway as chat/topic-organization — automatic failover applies here too
+- Naming variants of the same concept (e.g. "React Hooks" / "Hooks in React") are merged into one canonical topic; related-but-distinct concepts (e.g. "React State" vs "Redux") are kept separate
+- User-readable error responses for bad/corrupt/encrypted PDFs and pipeline timeouts — never a raw 500/stack trace
+- See `doc/pdf-extraction-phases.md` (in the main `toprep` repo) for the full phase-by-phase design
 
 ### 🛡️ Production Features
 - ⚡ **Powered by `uv`** - Lightning-fast dependency management
@@ -74,8 +79,8 @@ src/
 │   │   ├── router.py                 # Main API router
 │   │   └── routes/
 │   │       ├── chat.py               # Chat endpoints
-│   │       ├── youtube.py            # YouTube topic search endpoint
-│   │       ├── topics.py             # AI topic organization endpoint
+│   │       ├── ai.py                 # AI topic explanation + practice question endpoints
+│   │       ├── topics.py             # AI topic organization + PDF topic extraction endpoints
 │   │       └── health.py             # Health check endpoint
 │   │
 │   ├── core/                         # Core Configuration
@@ -84,8 +89,18 @@ src/
 │   │
 │   ├── services/                     # Business Logic Layer
 │   │   ├── chat_service.py           # Orchestrates message normalization → LLM
-│   │   ├── youtube_service.py        # YouTube search, enrichment, filtering, sorting
-│   │   └── topic_organizer_service.py# Builds the ordering prompt, validates the AI's permutation
+│   │   ├── ai_service.py             # Topic explanation + practice question prompts → LLM
+│   │   ├── topic_organizer_service.py# Builds the ordering prompt, validates the AI's permutation
+│   │   ├── llm_json.py               # Shared "extract a JSON object from an LLM reply" helper
+│   │   ├── pdf_extraction_service.py # Orchestrates the PDF -> topics pipeline (below)
+│   │   ├── pdf/                      # PDF ingestion stages
+│   │   │   ├── extractor.py          #   Validate + extract text (PyMuPDF) + OCR fallback
+│   │   │   ├── cleaner.py            #   Strip repeated headers/footers/page numbers
+│   │   │   └── chunker.py            #   TOC-aligned or windowed chunking
+│   │   └── topic_extraction/         # LLM stages over PDF chunks
+│   │       ├── extractor.py          #   Per-chunk topic extraction via the LLM gateway
+│   │       ├── normalizer.py         #   Cross-chunk normalization & deduplication
+│   │       └── prompts.py            #   System/user prompts for both stages
 │   │
 │   ├── gateway/                      # LLM Gateway & Failover
 │   │   ├── gateway.py                # Multi-provider LLM client
@@ -95,15 +110,21 @@ src/
 │   │
 │   └── schemas/                      # Pydantic Data Models
 │       ├── chat.py                   # Chat request/response schemas
-│       ├── youtube.py                # YouTube search request/response/filter schemas
-│       └── topics.py                 # Topic organization request/response schemas
+│       ├── ai.py                     # Explanation/questions request/response schemas
+│       ├── topics.py                 # Topic organization request/response schemas
+│       └── pdf.py                    # PDF document/chunk/topic + extract-pdf response schemas
 │
 ├── tests/                            # Test Suite
 │   ├── conftest.py                   # Pytest configuration
 │   ├── test_api.py                   # API endpoint tests
 │   ├── test_gateway.py               # LLM gateway tests
-│   ├── test_youtube.py               # YouTube search service & endpoint tests
-│   └── test_topic_organizer.py       # AI topic organizer service & endpoint tests
+│   ├── test_topic_organizer.py       # AI topic organizer service & endpoint tests
+│   ├── test_pdf_extractor.py         # PDF validation, text extraction, OCR fallback
+│   ├── test_pdf_cleaner.py           # Header/footer/page-number cleaning
+│   ├── test_pdf_chunker.py           # TOC-aligned & windowed chunking
+│   ├── test_pdf_topic_extractor.py   # LLM topic extraction per chunk
+│   ├── test_pdf_topic_normalizer.py  # LLM normalization & deduplication
+│   └── test_pdf_topics_endpoint.py   # POST /api/topics/extract-pdf, end to end
 │
 ├── run.py                            # Server entry point
 ├── pyproject.toml                    # Dependencies & tool config
@@ -117,8 +138,9 @@ src/
 |-----------|---------|--------|
 | **LLM Gateway** | Provider abstraction | Multi-provider with failover |
 | **Chat Service** | Orchestration | Normalizes messages → LLM Gateway |
-| **YouTube Service** | Topic video search | search.list → videos.list enrichment → filter → sort |
+| **AI Service** | Explanations & practice questions | Topic + preparation context → LLM Gateway |
 | **Topic Organizer** | AI-assisted ordering | Index-based JSON prompt → strict permutation validation |
+| **PDF Extraction Pipeline** | PDF → learning topics | Validate/extract (PyMuPDF + OCR) → clean → chunk → LLM extract → LLM normalize/dedup |
 
 ---
 
@@ -149,41 +171,41 @@ cp .env.example .env
 uv sync
 ```
 
-### 3. Configure Your LLM Provider
-Edit `.env` and choose your provider:
+### 3. Configure Your LLM Provider(s)
+Edit `.env` and add a key for any of the 5 supported providers — the gateway only
+loads deployments whose key is set, and tries them in this order: **Gemini → Groq →
+OpenAI → Mistral → Cerebras**. Configure just one, or several for real failover.
 
-**Option A: OpenAI (Default)**
+**Google Gemini** (supports up to 4 rotated keys, plus an optional quality-fallback model)
 ```env
-LLM_API_KEY=sk-proj-...
-LLM_DEFAULT_MODEL=gpt-4o-mini
+GOOGLE_API_KEY1=your_key
+GEMINI_MODEL=gemini-2.5-flash-lite
+GEMINI_FALLBACK_MODEL=gemini-2.5-flash
 ```
 
-**Option B: Groq (Fast & Cheap)**
+**Groq**
 ```env
-LLM_API_KEY=gsk_...
-LLM_BASE_URL=https://api.groq.com/openai/v1
-LLM_DEFAULT_MODEL=llama-3.3-70b-versatile
+GROQ_API_KEY=gsk_...
+GROQ_MODEL=openai/gpt-oss-20b
+GROQ_FALLBACK_MODEL=openai/gpt-oss-120b
 ```
 
-**Option C: DeepSeek**
+**OpenAI**
 ```env
-LLM_API_KEY=sk-...
-LLM_BASE_URL=https://api.deepseek.com/v1
-LLM_DEFAULT_MODEL=deepseek-chat
+OPENAI_API_KEY=sk-...
+OPENAI_MODEL=gpt-4o-mini
 ```
 
-**Option D: Ollama (Free & Local)**
+**Mistral**
 ```env
-LLM_API_KEY=ollama
-LLM_BASE_URL=http://localhost:11434/v1
-LLM_DEFAULT_MODEL=llama3.2
+MISTRAL_API_KEY=...
+MISTRAL_MODEL=mistral-small-latest
 ```
 
-**Option E: OpenRouter (200+ Models)**
+**Cerebras**
 ```env
-LLM_API_KEY=sk-or-v1-...
-LLM_BASE_URL=https://openrouter.ai/api/v1
-LLM_DEFAULT_MODEL=anthropic/claude-3.5-sonnet
+CEREBRAS_API_KEY=...
+CEREBRAS_MODEL=qwen-3.8-27b
 ```
 
 ---
@@ -234,26 +256,27 @@ curl http://localhost:8000/api/chat/fast-prompts
 
 Returns pre-built quick prompts for immediate use.
 
-### 4. YouTube Topic Search
+### 4. AI Topic Explanation & Practice Questions
 ```bash
-curl -X POST http://localhost:8000/api/youtube/search \
+curl -X POST http://localhost:8000/api/ai/explain \
   -H "Content-Type: application/json" \
   -d '{
-    "topic": "React hooks",
-    "filters": {
-      "min_duration_seconds": 300,
-      "max_duration_seconds": 1800,
-      "min_views": 1000,
-      "published_window": "past_year",
-      "exclude_shorts": true,
-      "exclude_livestreams": true,
-      "max_results": 10,
-      "sort": "views"
-    }
+    "topic_name": "React Hooks",
+    "preparation_type": "Interview",
+    "preparation_description": "Full Stack Developer Interview"
+  }'
+
+curl -X POST http://localhost:8000/api/ai/questions \
+  -H "Content-Type: application/json" \
+  -d '{
+    "topic_name": "React Hooks",
+    "preparation_type": "Interview"
   }'
 ```
 
-`filters` is optional — omit it entirely for a relevance-sorted, unfiltered search of up to `YOUTUBE_DEFAULT_MAX_RESULTS` videos.
+`/explain` returns `{"explanation": "...", "provider": "...", "model": "..."}` (a 2-3 line
+explanation); `/questions` returns `{"questions": [...], "provider": "...", "model": "..."}`
+(3-5 expected questions). `preparation_type`/`preparation_description` are optional context.
 
 ### 5. AI Topic Organization
 ```bash
@@ -274,18 +297,41 @@ curl -X POST http://localhost:8000/api/topics/organize \
 
 Returns `ordered_topic_ids` (a permutation of the input IDs) plus a one-sentence `reasoning`. Requires at least two topics.
 
+### 6. PDF Topic Extraction
+```bash
+curl -X POST http://localhost:8000/api/topics/extract-pdf \
+  -F "file=@interview-guide.pdf;type=application/pdf"
+```
+
+Returns `{"topics": ["React Hooks", "JavaScript Promises", ...]}` — a flat, deduplicated
+list ready to feed into a bulk-add-topics flow. Rejects non-PDF uploads with `400`,
+unreadable/encrypted/empty PDFs with `422`, and an overly slow extraction with `504` —
+all with a plain-English `detail` message, never a stack trace.
+
 ---
 
 ## 🔧 Configuration
 
 ### Environment Variables (`.env`)
 
-**LLM Configuration:**
+**LLM Provider Configuration** (configure at least one; see [Quickstart](#3-configure-your-llm-providers) for per-provider details):
 ```env
-LLM_API_KEY=your_api_key
-LLM_BASE_URL=https://api.openai.com/v1           # Optional
-LLM_DEFAULT_MODEL=gpt-4o-mini
-LLM_TIMEOUT=60
+GOOGLE_API_KEY1=          # up to GOOGLE_API_KEY4
+GEMINI_MODEL=gemini-2.5-flash-lite
+GEMINI_FALLBACK_MODEL=gemini-2.5-flash
+
+GROQ_API_KEY=
+GROQ_MODEL=openai/gpt-oss-20b
+GROQ_FALLBACK_MODEL=openai/gpt-oss-120b
+
+OPENAI_API_KEY=
+OPENAI_MODEL=gpt-4o-mini
+
+MISTRAL_API_KEY=
+MISTRAL_MODEL=mistral-small-latest
+
+CEREBRAS_API_KEY=
+CEREBRAS_MODEL=qwen-3.8-27b
 ```
 
 **Gateway Configuration:**
@@ -294,7 +340,7 @@ GATEWAY_MAX_ATTEMPTS=10
 GATEWAY_COOLDOWN_SECONDS=60
 ```
 
-**YouTube Configuration:**
+**YouTube Configuration (reserved, currently unused):**
 ```env
 YOUTUBE_API_KEY=your_youtube_data_api_key_here
 YOUTUBE_API_BASE_URL=https://www.googleapis.com/youtube/v3   # Optional
@@ -302,6 +348,8 @@ YOUTUBE_REQUEST_TIMEOUT=15
 YOUTUBE_DEFAULT_MAX_RESULTS=10
 YOUTUBE_MAX_RESULTS_LIMIT=25
 ```
+The backend's YouTube search route/service were removed in favor of a frontend-only
+implementation. These `Settings` fields still exist but nothing currently reads them.
 
 **Server Configuration:**
 ```env
@@ -375,6 +423,7 @@ uv run pytest --cov=src.app tests/
 - `fastapi` - Web framework
 - `uvicorn` - ASGI server
 - `pydantic` - Data validation
+- `python-multipart` - Multipart form parsing (required for the PDF upload endpoint)
 
 **LLM & AI:**
 - `openai` - OpenAI API
@@ -399,10 +448,13 @@ This backend powers the **ToPrep** Next.js frontend with:
 
 | Feature | Endpoint | Frontend Component |
 |---------|----------|-------------------|
-| **Topic Explanations** | `POST /api/chat` | TopicContainer.tsx |
-| **Practice Questions** | `POST /api/chat` | TopicContainer.tsx |
-| **Video Search** | `POST /api/youtube/search` | YouTube components |
-| **Topic Ordering** | `POST /api/topics/organize` | SectionBoard.tsx |
+| **Topic Explanations** | `POST /api/ai/explain` | TopicContainer.tsx (via `lib/api/aiService.ts`) |
+| **Practice Questions** | `POST /api/ai/questions` | TopicContainer.tsx (via `lib/api/aiService.ts`) |
+| **Topic Ordering** | `POST /api/topics/organize` | AiOrganizeButton.tsx |
+| **PDF Topic Extraction** | `POST /api/topics/extract-pdf` | AddTopicPanel.tsx |
+
+`POST /api/chat` and `GET /api/chat/fast-prompts` are implemented and tested but not
+currently called by the frontend — available for a future chat UI.
 
 ### Frontend Setup
 The frontend expects the backend at:
