@@ -60,3 +60,18 @@ class PdfChunk(BaseModel):
     )
     pages: List[int] = Field(..., description="1-indexed source page numbers covered by this chunk")
     text: str = Field(..., description="Concatenated cleaned text of the covered pages")
+
+
+class ExtractedTopic(BaseModel):
+    """A learning topic extracted from one or more PDF chunks.
+
+    Kept rich internally (source pages/chunks) even though the v1 API only
+    serializes `name` -- see doc/pdf-extraction-phases.md Phase 8.
+    """
+    name: str = Field(..., description="Learner-facing topic name")
+    source_pages: List[int] = Field(
+        default_factory=list, description="1-indexed pages this topic was drawn from"
+    )
+    chunk_ids: List[str] = Field(
+        default_factory=list, description="Chunk(s) this topic was extracted from"
+    )

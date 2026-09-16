@@ -10,7 +10,6 @@ no open-ended interaction. This service never applies anything itself;
 the caller decides how/when to apply the suggestion.
 """
 
-import json
 import logging
 from typing import List, Optional, Tuple
 
@@ -23,6 +22,7 @@ from src.app.schemas.topics import (
     TopicSectionAssignment,
 )
 from src.app.services.chat_service import gateway
+from src.app.services.llm_json import extract_json_object
 
 logger = logging.getLogger("TopicOrganizerService")
 
@@ -78,23 +78,14 @@ def _build_user_prompt(
     return f"{context}\n\nTopics:\n{numbered}{section_block}"
 
 
-def _extract_json_object(raw_reply: str) -> dict:
-    """Extracts the outermost {...} block from a reply, tolerating surrounding prose/fences."""
-    start = raw_reply.find("{")
-    end = raw_reply.rfind("}")
-    if start == -1 or end == -1 or end < start:
-        raise TopicOrganizerError("AI response did not contain a JSON object.")
-    try:
-        return json.loads(raw_reply[start : end + 1])
-    except json.JSONDecodeError as e:
-        raise TopicOrganizerError(f"AI response was not valid JSON: {e}")
-
-
 def _parse_response(
     raw_reply: str, expected_length: int
 ) -> Tuple[List[int], List[Optional[str]], Optional[str]]:
     """Parses and validates the AI's ordering and section grouping."""
-    payload = _extract_json_object(raw_reply)
+    try:
+        payload = extract_json_object(raw_reply)
+    except ValueError as e:
+        raise TopicOrganizerError(str(e))
     order = payload.get("order")
     reasoning = payload.get("reasoning")
 
