@@ -56,6 +56,7 @@ class Settings(BaseSettings):
     PDF_MIN_TEXT_CHARS_PER_PAGE: int = 20  # below this, a page falls back to OCR
     PDF_OCR_ENABLED: bool = True  # disable in environments without a Tesseract install
     PDF_CHUNK_MAX_CHARS: int = 8000  # per-chunk character budget when no TOC-based boundaries exist
+    PDF_PIPELINE_TIMEOUT_SECONDS: float = 120.0  # caps the whole extract-pdf request (multi-chunk LLM calls)
 
     # YouTube Data API Configuration
     YOUTUBE_API_KEY: str = ""

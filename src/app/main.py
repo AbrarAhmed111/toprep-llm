@@ -50,6 +50,7 @@ async def root():
             "chat": "/api/chat",
             "fast_prompts": "/api/chat/fast-prompts",
             "organize_topics": "/api/topics/organize",
+            "extract_pdf_topics": "/api/topics/extract-pdf",
             "ai_explain": "/api/ai/explain",
             "ai_questions": "/api/ai/questions",
             "health": "/health",

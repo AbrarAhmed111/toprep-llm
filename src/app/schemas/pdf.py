@@ -75,3 +75,9 @@ class ExtractedTopic(BaseModel):
     chunk_ids: List[str] = Field(
         default_factory=list, description="Chunk(s) this topic was extracted from"
     )
+
+
+class PdfTopicsResponse(BaseModel):
+    """Flat, deduplicated topic names -- the v1 API contract already consumed
+    by the frontend's bulk-add-topics flow (see AddTopicPanel.tsx)."""
+    topics: List[str] = Field(..., description="Deduplicated, learner-facing topic names")
