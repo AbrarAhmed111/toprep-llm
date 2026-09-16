@@ -49,3 +49,14 @@ class PdfDocument(BaseModel):
     """Intermediate representation between PDF extraction and topic extraction."""
     metadata: PdfMetadata
     pages: List[PdfPage]
+
+
+class PdfChunk(BaseModel):
+    """A group of one or more pages, bounded by document structure when
+    available, ready to be sent to the LLM for topic extraction."""
+    chunk_id: str = Field(..., description="Stable identifier, e.g. 'chunk_1'")
+    heading: Optional[str] = Field(
+        None, description="TOC heading this chunk falls under, if the document had usable structure"
+    )
+    pages: List[int] = Field(..., description="1-indexed source page numbers covered by this chunk")
+    text: str = Field(..., description="Concatenated cleaned text of the covered pages")
