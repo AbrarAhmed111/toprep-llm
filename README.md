@@ -6,7 +6,9 @@
 
 # 🚀 LLM Gateway Service
 
-**A production-ready FastAPI backend** for chat completions with a multi-provider LLM gateway and automatic failover.
+**A production-ready FastAPI backend** built around a multi-provider LLM gateway with
+automatic failover, powering AI-assisted topic organization, topic explanations &
+practice questions, PDF-to-topics extraction, and chat completions.
 
 This service powers **[ToPrep](https://github.com/AbrarAhmed111/toprep)** — an AI-powered preparation platform for interviews, exams, and certifications.
 
