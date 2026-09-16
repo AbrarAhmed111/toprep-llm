@@ -316,6 +316,21 @@ LOG_LEVEL=INFO
 ALLOWED_ORIGINS=http://localhost:3000,https://example.com
 ```
 
+**PDF Ingestion Configuration:**
+```env
+PDF_MAX_SIZE_BYTES=15728640      # 15MB, matches the frontend's upload cap
+PDF_MIN_TEXT_CHARS_PER_PAGE=20   # below this, a page falls back to OCR
+PDF_OCR_ENABLED=true             # set false in environments without Tesseract installed
+```
+
+OCR fallback (for scanned/image-only PDF pages) uses PyMuPDF's built-in Tesseract
+integration and requires a **system-level Tesseract-OCR install** with English
+`tessdata` available — this can't be installed via `pip`/`uv` alone. If Tesseract
+isn't available in your environment, set `PDF_OCR_ENABLED=false`; text-based PDFs are
+unaffected, and pages that would have needed OCR are recorded as `ocr_failed` instead
+of aborting the whole document. See `doc/pdf-extraction-phases.md` (in the main
+`toprep` repo) for the full pipeline design.
+
 ---
 
 ## 🧪 Testing
@@ -365,6 +380,9 @@ uv run pytest --cov=src.app tests/
 - `openai` - OpenAI API
 - `langchain-core` - LLM abstractions
 - `langchain-openai` - OpenAI integration
+
+**PDF Ingestion:**
+- `pymupdf` - PDF validation, text extraction, and OCR fallback
 
 **Testing:**
 - `pytest` - Testing framework

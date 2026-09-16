@@ -51,6 +51,11 @@ class Settings(BaseSettings):
     CEREBRAS_API_KEY: str = ""
     CEREBRAS_MODEL: str = "qwen-3.8-27b"
 
+    # PDF Ingestion (see doc/pdf-extraction-phases.md)
+    PDF_MAX_SIZE_BYTES: int = 15 * 1024 * 1024  # 15MB, matches the frontend's upload cap
+    PDF_MIN_TEXT_CHARS_PER_PAGE: int = 20  # below this, a page falls back to OCR
+    PDF_OCR_ENABLED: bool = True  # disable in environments without a Tesseract install
+
     # YouTube Data API Configuration
     YOUTUBE_API_KEY: str = ""
     YOUTUBE_API_BASE_URL: str = "https://www.googleapis.com/youtube/v3"
