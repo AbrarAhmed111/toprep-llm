@@ -51,11 +51,14 @@ Built by **[Abrar Ahmed](https://www.abrarahmed.pro)** | Managed with [uv](https
 - Ordering only — never applied silently; the caller shows the suggestion for explicit review/accept
 
 ### 📄 PDF Topic Extraction
-- `POST /api/topics/extract-pdf` - Upload a PDF, get back a flat list of learning topics
-- **Pipeline**: validate → extract text (PyMuPDF, page-level, TOC-aware) → OCR fallback for scanned pages → clean (strip repeated headers/footers/page numbers) → chunk (TOC-aligned or windowed) → LLM topic extraction per chunk → LLM normalization/dedup across chunks
+- `POST /api/topics/extract-pdf` - Upload a PDF, get back a sectioned list of learning topics, streamed as it happens
+- **Streamed as Server-Sent Events** - the response is a live stream of stage events (`validating` → `reading` → `analyzing` → `organizing` → `grouping` → `complete`/`error`), including per-chunk progress ("AI is reading section 2 of 5…"), so the caller can show real progress instead of a blind spinner
+- **Pipeline**: validate → extract text (PyMuPDF, page-level, TOC-aware) → OCR fallback for scanned pages → clean (strip repeated headers/footers/page numbers) → chunk (TOC-aligned or windowed) → LLM topic extraction per chunk → LLM normalization/dedup across chunks → LLM section grouping
 - Every LLM call goes through the same multi-provider gateway as chat/topic-organization — automatic failover applies here too
-- Naming variants of the same concept (e.g. "React Hooks" / "Hooks in React") are merged into one canonical topic; related-but-distinct concepts (e.g. "React State" vs "Redux") are kept separate
-- User-readable error responses for bad/corrupt/encrypted PDFs and pipeline timeouts — never a raw 500/stack trace
+- Extraction is exhaustive on already-structured input: a document that's a syllabus/roadmap/outline (headings with bullet points) gets every bullet extracted as its own topic, not just the heading; ordinary prose still gets summarized into a smaller set of genuinely useful topics
+- Naming variants of the same concept (e.g. "React Hooks" / "Hooks in React") are merged into one canonical topic; related-but-distinct concepts (e.g. "React State" vs "Redux") are kept separate — the merge prompt only reports actual duplicate groups (an omitted topic means "no duplicate"), keeping the response compact regardless of how many topics were extracted
+- The deduplicated topics are then run through the same AI organizer that powers `/api/topics/organize`, so a document that's already organized into sections comes back pre-sorted into matching sections instead of one flat list (best-effort — falls back to a flat, ungrouped list rather than losing already-extracted topics if this pass fails)
+- User-readable error responses for bad/corrupt/encrypted PDFs and pipeline timeouts, delivered as an in-stream `error` event rather than a raw 500/stack trace
 - See `doc/pdf-extraction-phases.md` (in the main `toprep` repo) for the full phase-by-phase design
 
 ### 🛡️ Production Features
@@ -142,7 +145,7 @@ src/
 | **Chat Service** | Orchestration | Normalizes messages → LLM Gateway |
 | **AI Service** | Explanations & practice questions | Topic + preparation context → LLM Gateway |
 | **Topic Organizer** | AI-assisted ordering | Index-based JSON prompt → strict permutation validation |
-| **PDF Extraction Pipeline** | PDF → learning topics | Validate/extract (PyMuPDF + OCR) → clean → chunk → LLM extract → LLM normalize/dedup |
+| **PDF Extraction Pipeline** | PDF → sectioned learning topics, streamed live | Validate/extract (PyMuPDF + OCR) → clean → chunk → LLM extract → LLM normalize/dedup → LLM section-group, each stage streamed as an SSE progress event |
 
 ---
 
@@ -301,14 +304,32 @@ Returns `ordered_topic_ids` (a permutation of the input IDs) plus a one-sentence
 
 ### 6. PDF Topic Extraction
 ```bash
-curl -X POST http://localhost:8000/api/topics/extract-pdf \
+curl -N -X POST http://localhost:8000/api/topics/extract-pdf \
   -F "file=@interview-guide.pdf;type=application/pdf"
 ```
 
-Returns `{"topics": ["React Hooks", "JavaScript Promises", ...]}` — a flat, deduplicated
-list ready to feed into a bulk-add-topics flow. Rejects non-PDF uploads with `400`,
-unreadable/encrypted/empty PDFs with `422`, and an overly slow extraction with `504` —
-all with a plain-English `detail` message, never a stack trace.
+Streams `text/event-stream`, one `data: {...}` line per pipeline stage, e.g.:
+```
+data: {"stage": "validating", "status": "active", "message": "Validating your PDF…"}
+data: {"stage": "validating", "status": "done"}
+data: {"stage": "reading", "status": "active", "message": "Reading the document…"}
+data: {"stage": "reading", "status": "done", "message": "Read 4 pages"}
+data: {"stage": "analyzing", "status": "active", "message": "AI is reading section 1 of 2…", "current": 1, "total": 2}
+data: {"stage": "analyzing", "status": "done", "message": "Found 9 candidate topics"}
+data: {"stage": "organizing", "status": "active", "message": "Grouping duplicate topics…"}
+data: {"stage": "organizing", "status": "done"}
+data: {"stage": "grouping", "status": "active", "message": "Sorting topics into sections…"}
+data: {"stage": "grouping", "status": "done"}
+data: {"stage": "complete", "status": "done", "topics": [{"name": "React Hooks", "section": "Frontend"}, ...]}
+```
+
+Ends in either that `complete` event (`topics` ready for a bulk-add-topics-with-sections
+flow) or an `error` event (`{"stage": "error", "status": "error", "message": "...",
+"status_code": 400 | 422 | 502 | 504}`) — a bad/corrupt/encrypted PDF, an AI failure, or
+an overly slow extraction all surface this way instead of a stack trace, since by the
+time the pipeline can discover them the 200 + event-stream headers are already sent. A
+non-PDF upload is the one thing still rejected up front with a plain `400`, before any
+streaming begins.
 
 ---
 

@@ -1,13 +1,15 @@
 """
 API-level tests for POST /api/topics/extract-pdf.
 Completely mocked LLM calls (patched on the shared chat_service.gateway
-singleton) -- verifies the endpoint contract the frontend already relies on
-(pdfExtraction.ts): multipart `file` in, `{"topics": [...]}` out, and
-user-readable error details rather than raw 500s for bad input.
+singleton) -- verifies the endpoint contract the frontend relies on
+(pdfExtraction.ts): multipart `file` in, a Server-Sent Events stream of
+progress events out, ending in either a "complete" event with `topics` or
+an "error" event with a user-readable `message` and `status_code`.
 """
 
 import asyncio
 import json
+from typing import Any, Dict, List
 from unittest.mock import AsyncMock, patch
 
 import pymupdf
@@ -28,8 +30,16 @@ def _build_pdf_bytes(page_texts):
     return data
 
 
+def _parse_sse_events(raw_text: str) -> List[Dict[str, Any]]:
+    events = []
+    for line in raw_text.splitlines():
+        if line.startswith("data: "):
+            events.append(json.loads(line[len("data: ") :]))
+    return events
+
+
 @pytest.mark.asyncio
-async def test_extract_pdf_endpoint_returns_deduplicated_topics():
+async def test_extract_pdf_endpoint_streams_progress_then_deduplicated_topics():
     pdf_bytes = _build_pdf_bytes(
         [
             "React Hooks let you use state in function components.",
@@ -37,12 +47,12 @@ async def test_extract_pdf_endpoint_returns_deduplicated_topics():
         ]
     )
     extraction_reply = json.dumps({"topics": ["React Hooks", "JavaScript Promises"]})
-    normalization_reply = json.dumps(
+    normalization_reply = json.dumps({"groups": []})
+    grouping_reply = json.dumps(
         {
-            "groups": [
-                {"name": "React Hooks", "indices": [0]},
-                {"name": "JavaScript Promises", "indices": [1]},
-            ]
+            "order": [0, 1],
+            "sections": ["Frontend Basics"],
+            "topic_section_indices": [0, 0],
         }
     )
 
@@ -53,6 +63,7 @@ async def test_extract_pdf_endpoint_returns_deduplicated_topics():
             side_effect=[
                 (extraction_reply, "Groq", "test-model", {}, []),
                 (normalization_reply, "Groq", "test-model", {}, []),
+                (grouping_reply, "Groq", "test-model", {}, []),
             ]
         ),
     ):
@@ -63,7 +74,31 @@ async def test_extract_pdf_endpoint_returns_deduplicated_topics():
             )
 
     assert response.status_code == 200
-    assert response.json() == {"topics": ["React Hooks", "JavaScript Promises"]}
+    assert response.headers["content-type"].startswith("text/event-stream")
+
+    events = _parse_sse_events(response.text)
+    stages = [e["stage"] for e in events]
+    assert stages == [
+        "validating",
+        "validating",
+        "reading",
+        "reading",
+        "analyzing",
+        "analyzing",
+        "organizing",
+        "organizing",
+        "grouping",
+        "grouping",
+        "complete",
+    ]
+    assert events[-1] == {
+        "stage": "complete",
+        "status": "done",
+        "topics": [
+            {"name": "React Hooks", "section": "Frontend Basics"},
+            {"name": "JavaScript Promises", "section": "Frontend Basics"},
+        ],
+    }
 
 
 @pytest.mark.asyncio
@@ -81,32 +116,39 @@ async def test_extract_pdf_endpoint_rejects_non_pdf_upload():
 
 
 @pytest.mark.asyncio
-async def test_extract_pdf_endpoint_returns_readable_error_for_corrupt_pdf():
+async def test_extract_pdf_endpoint_streams_readable_error_for_corrupt_pdf():
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
         response = await client.post(
             "/api/topics/extract-pdf",
             files={"file": ("guide.pdf", b"this is not really a pdf", "application/pdf")},
         )
 
-    assert response.status_code == 422
-    detail = response.json()["detail"]
-    assert "could not be processed" in detail.lower()
-    assert "Traceback" not in detail
+    assert response.status_code == 200
+    events = _parse_sse_events(response.text)
+    error_event = events[-1]
+    assert error_event["stage"] == "error"
+    assert error_event["status_code"] == 422
+    assert "could not be processed" in error_event["message"].lower()
+    assert "Traceback" not in error_event["message"]
 
 
 @pytest.mark.asyncio
-async def test_extract_pdf_endpoint_times_out_on_slow_pipeline(monkeypatch):
+async def test_extract_pdf_endpoint_streams_timeout_error_on_slow_pipeline(monkeypatch):
     monkeypatch.setattr(get_settings(), "PDF_PIPELINE_TIMEOUT_SECONDS", 0.05)
 
     async def _slow_pipeline(_file_bytes):
         await asyncio.sleep(0.3)
-        return ["Should never be reached"]
+        yield {"stage": "complete", "status": "done", "topics": ["Should never be reached"]}
 
-    with patch("src.app.api.routes.topics.extract_topics_from_pdf", new=_slow_pipeline):
+    with patch("src.app.api.routes.topics.stream_topics_from_pdf", new=_slow_pipeline):
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             response = await client.post(
                 "/api/topics/extract-pdf",
                 files={"file": ("guide.pdf", b"%PDF-1.4 minimal placeholder", "application/pdf")},
             )
 
-    assert response.status_code == 504
+    assert response.status_code == 200
+    events = _parse_sse_events(response.text)
+    assert len(events) == 1
+    assert events[0]["stage"] == "error"
+    assert events[0]["status_code"] == 504
