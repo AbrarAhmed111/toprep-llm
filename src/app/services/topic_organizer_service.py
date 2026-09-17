@@ -47,13 +47,19 @@ SYSTEM_PROMPT = (
     "3 or more topics.\n\n"
     "Respond with ONLY a JSON object of this exact shape:\n"
     '{"order": [<index>, <index>, ...], '
-    '"topic_sections": [<section name or null>, <section name or null>, ...], '
+    '"sections": [<section name>, <section name>, ...], '
+    '"topic_section_indices": [<index into "sections", or null>, ...], '
     '"reasoning": "<one short sentence>"}\n\n'
     'The "order" array MUST be a permutation of every input index (0-based), '
     "the same length as the input, each index appearing exactly once.\n"
-    'The "topic_sections" array MUST have exactly one entry per input topic, '
-    "in INPUT order (index i of this array describes input topic i, "
-    "regardless of the order array). "
+    'The "sections" array lists each DISTINCT section name you used, ONCE '
+    "each -- do not repeat a section's full name for every topic that uses "
+    "it, reference it by its index in this array instead. This keeps the "
+    "response compact on large topic lists.\n"
+    'The "topic_section_indices" array MUST have exactly one entry per input '
+    "topic, in INPUT order (index i of this array describes input topic i, "
+    'regardless of the order array): either an integer index into "sections", '
+    "or null to leave that topic ungrouped. "
     "Do not include any text outside the JSON object."
 )
 
@@ -109,13 +115,32 @@ def _parse_response(
 
     # Section grouping is a best-effort addition — fall back to "ungrouped"
     # for every topic rather than failing the whole (already-valid) ordering.
-    topic_sections = payload.get("topic_sections")
-    if not isinstance(topic_sections, list) or len(topic_sections) != expected_length:
-        topic_sections = [None] * expected_length
-    else:
-        topic_sections = [
-            s.strip() if isinstance(s, str) and s.strip() else None for s in topic_sections
-        ]
+    # Sections are referenced by index into "sections" rather than repeating
+    # the full name per topic, so the response stays compact on large lists.
+    topic_sections = [None] * expected_length
+    section_names = payload.get("sections")
+    section_indices = payload.get("topic_section_indices")
+    if (
+        isinstance(section_names, list)
+        and all(isinstance(s, str) for s in section_names)
+        and isinstance(section_indices, list)
+        and len(section_indices) == expected_length
+    ):
+        resolved: List[Optional[str]] = []
+        for raw_index in section_indices:
+            if raw_index is None:
+                resolved.append(None)
+                continue
+            try:
+                index = int(raw_index)
+            except (TypeError, ValueError):
+                resolved = [None] * expected_length
+                break
+            if index < 0 or index >= len(section_names) or not section_names[index].strip():
+                resolved = [None] * expected_length
+                break
+            resolved.append(section_names[index].strip())
+        topic_sections = resolved
 
     return normalized_order, topic_sections, reasoning if isinstance(reasoning, str) else None
 
@@ -146,7 +171,7 @@ class TopicOrganizerService:
             reply, provider_name, model_name, _usage, _events = await self.gateway.generate(
                 messages=messages,
                 temperature=0.2,
-                max_tokens=800,
+                max_tokens=3000,
             )
         except Exception as e:
             logger.error(f"❌ Topic organization LLM call failed: {e}")

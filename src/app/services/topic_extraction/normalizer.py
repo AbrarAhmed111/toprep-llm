@@ -34,7 +34,12 @@ class TopicNormalizationError(Exception):
 
 
 def _validate_groups(groups_raw: list, expected_length: int) -> List[Tuple[str, List[int]]]:
-    """Validates that every input index is covered exactly once across all groups."""
+    """Validates the AI's duplicate-merge groups.
+
+    Unlike a full partition, an index is allowed to appear in *no* group --
+    that's how the model reports "this topic has no duplicate" (see
+    NORMALIZATION_SYSTEM_PROMPT). It just can't appear in more than one.
+    """
     seen = set()
     groups: List[Tuple[str, List[int]]] = []
 
@@ -62,9 +67,6 @@ def _validate_groups(groups_raw: list, expected_length: int) -> List[Tuple[str, 
 
         groups.append((name.strip(), int_indices))
 
-    if len(seen) != expected_length:
-        raise TopicNormalizationError("Not every extracted topic was assigned to a group.")
-
     return groups
 
 
@@ -88,7 +90,7 @@ async def normalize_and_deduplicate(
         reply, provider_name, model_name, _usage, _events = await gateway_instance.generate(
             messages=messages,
             temperature=0.1,
-            max_tokens=1500,
+            max_tokens=2000,
         )
     except Exception as e:
         logger.error(f"❌ Topic normalization LLM call failed: {e}")
@@ -106,10 +108,17 @@ async def normalize_and_deduplicate(
     groups = _validate_groups(groups_raw, expected_length=len(topics))
 
     merged: List[ExtractedTopic] = []
+    grouped_indices: set = set()
     for name, indices in groups:
+        grouped_indices.update(indices)
         pages = sorted({p for i in indices for p in topics[i].source_pages})
         chunk_ids = sorted({c for i in indices for c in topics[i].chunk_ids})
         merged.append(ExtractedTopic(name=name, source_pages=pages, chunk_ids=chunk_ids))
+
+    # Any index the AI didn't mention has no duplicate -- keep it as-is.
+    for i, topic in enumerate(topics):
+        if i not in grouped_indices:
+            merged.append(topic)
 
     logger.info(
         f"✨ Normalized {len(topics)} raw topic(s) into {len(merged)} via {provider_name} ({model_name})."

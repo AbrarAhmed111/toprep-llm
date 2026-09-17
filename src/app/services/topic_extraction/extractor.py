@@ -61,7 +61,7 @@ async def extract_topics_from_chunk(chunk: PdfChunk, gateway_instance=gateway) -
         reply, provider_name, model_name, _usage, _events = await gateway_instance.generate(
             messages=messages,
             temperature=0.2,
-            max_tokens=800,
+            max_tokens=2000,
         )
     except Exception as e:
         logger.error(f"❌ Topic extraction LLM call failed for {chunk.chunk_id}: {e}")

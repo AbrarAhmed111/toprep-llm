@@ -116,7 +116,8 @@ async def test_organize_returns_section_assignments():
     mock_reply = json.dumps(
         {
             "order": [1, 2, 0],
-            "topic_sections": ["Frontend", "Frontend", "JS Fundamentals"],
+            "sections": ["Frontend", "JS Fundamentals"],
+            "topic_section_indices": [0, 0, 1],
             "reasoning": "Grouped by layer.",
         }
     )
@@ -145,8 +146,33 @@ async def test_organize_returns_section_assignments():
 @pytest.mark.asyncio
 async def test_organize_falls_back_to_ungrouped_on_malformed_sections():
     service = TopicOrganizerService()
-    # topic_sections is the wrong length — should not fail the whole (valid) ordering.
-    mock_reply = json.dumps({"order": [1, 2, 0], "topic_sections": ["Frontend"]})
+    # topic_section_indices is the wrong length -- should not fail the whole
+    # (already-valid) ordering.
+    mock_reply = json.dumps(
+        {"order": [1, 2, 0], "sections": ["Frontend"], "topic_section_indices": [0]}
+    )
+
+    with patch.object(
+        service.gateway,
+        "generate",
+        new=AsyncMock(return_value=(mock_reply, "Groq", "test-model", {}, [])),
+    ):
+        result = await service.organize("Frontend Interview", "Interview", TOPICS)
+
+    assert result.ordered_topic_ids == ["t2", "t3", "t1"]
+    assert all(a.section_name is None for a in result.section_assignments)
+
+
+@pytest.mark.asyncio
+async def test_organize_falls_back_to_ungrouped_on_out_of_range_section_index():
+    service = TopicOrganizerService()
+    mock_reply = json.dumps(
+        {
+            "order": [1, 2, 0],
+            "sections": ["Frontend"],
+            "topic_section_indices": [0, 5, 0],  # 5 is out of range
+        }
+    )
 
     with patch.object(
         service.gateway,
@@ -207,7 +233,8 @@ async def test_organize_endpoint_returns_section_assignments():
     mock_reply = json.dumps(
         {
             "order": [1, 2, 0],
-            "topic_sections": ["Frontend", "Frontend", "JS Fundamentals"],
+            "sections": ["Frontend", "JS Fundamentals"],
+            "topic_section_indices": [0, 0, 1],
             "reasoning": "Grouped by layer.",
         }
     )

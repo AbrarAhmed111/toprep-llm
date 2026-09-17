@@ -79,15 +79,32 @@ async def test_skips_llm_call_for_a_single_topic():
 
 
 @pytest.mark.asyncio
-async def test_rejects_response_that_omits_an_index():
+async def test_keeps_topics_with_no_duplicate_as_singletons():
+    # The AI only reports actual duplicate groups; an omitted index (like 1
+    # here) means "no duplicate" and must survive under its original name.
     topics = [_topic("A", [1], "chunk_1"), _topic("B", [2], "chunk_2")]
-    mock_reply = json.dumps({"groups": [{"name": "A", "indices": [0]}]})  # index 1 missing
+    mock_reply = json.dumps({"groups": [{"name": "A", "indices": [0]}]})
 
     with patch.object(
         gateway, "generate", new=AsyncMock(return_value=(mock_reply, "Groq", "test-model", {}, []))
     ):
-        with pytest.raises(TopicNormalizationError):
-            await normalize_and_deduplicate(topics)
+        result = await normalize_and_deduplicate(topics)
+
+    assert {t.name for t in result} == {"A", "B"}
+    assert len(result) == 2
+
+
+@pytest.mark.asyncio
+async def test_empty_groups_list_keeps_every_topic_as_is():
+    topics = [_topic("A", [1], "chunk_1"), _topic("B", [2], "chunk_2")]
+    mock_reply = json.dumps({"groups": []})
+
+    with patch.object(
+        gateway, "generate", new=AsyncMock(return_value=(mock_reply, "Groq", "test-model", {}, []))
+    ):
+        result = await normalize_and_deduplicate(topics)
+
+    assert result == topics
 
 
 @pytest.mark.asyncio
