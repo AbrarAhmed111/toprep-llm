@@ -103,6 +103,11 @@ def _parse_response(
     reasoning = payload.get("reasoning")
 
     if not isinstance(order, list) or len(order) != expected_length:
+        got = len(order) if isinstance(order, list) else type(order).__name__
+        logger.warning(
+            f"⚠️ Order length mismatch: expected {expected_length}, got {got}. "
+            f"Raw reply ({len(raw_reply)} chars): {raw_reply[:500]!r}"
+        )
         raise TopicOrganizerError("AI response did not return a complete ordering.")
 
     try:
@@ -171,7 +176,7 @@ class TopicOrganizerService:
             reply, provider_name, model_name, _usage, _events = await self.gateway.generate(
                 messages=messages,
                 temperature=0.2,
-                max_tokens=3000,
+                max_tokens=8000,
             )
         except Exception as e:
             logger.error(f"❌ Topic organization LLM call failed: {e}")
