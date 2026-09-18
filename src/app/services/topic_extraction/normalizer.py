@@ -90,7 +90,7 @@ async def normalize_and_deduplicate(
         reply, provider_name, model_name, _usage, _events = await gateway_instance.generate(
             messages=messages,
             temperature=0.1,
-            max_tokens=2000,
+            max_tokens=8000,
         )
     except Exception as e:
         logger.error(f"❌ Topic normalization LLM call failed: {e}")
